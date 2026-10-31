@@ -1,5 +1,15 @@
 {
-  "dependencies": {
-    "react-router-dom": "^7.18.5"
+  "name": "brightloop",
+  "private": true,
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "setup": "npm --prefix backend install && npm --prefix brightloop-frontend install",
+    "dev": "node scripts/dev.mjs",
+    "build": "npm --prefix brightloop-frontend run build",
+    "start": "npm --prefix backend start",
+    "test": "npm --prefix backend test"
   }
 }
