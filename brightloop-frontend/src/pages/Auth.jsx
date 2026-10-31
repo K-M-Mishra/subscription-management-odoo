@@ -1,110 +1,138 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { auth } from '../api';
-
-export default function Auth() {
-  const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  
-  const [loading, setLoading] = useState(false);
-  const [globalError, setGlobalError] = useState(null);
-  const [fieldErrors, setFieldErrors] = useState({});
-
-  const handleSubmit = async (e) => {
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { api } from '../api';
+import { useSession } from '../session';
+import { Alert, Field } from '../ui';
+export default function Auth({ mode }) {
+  const { setUser } = useSession(),
+    navigate = useNavigate(),
+    [search] = useSearchParams();
+  const [form, setForm] = useState({ name: '', email: '', password: '' }),
+    [error, setError] = useState(''),
+    [message, setMessage] = useState(''),
+    [busy, setBusy] = useState(false);
+  useEffect(() => {
+    setError('');
+    setMessage('');
+    setForm({ name: '', email: '', password: '' });
+  }, [mode]);
+  const title = {
+    login: 'Welcome back.',
+    signup: 'Create your account.',
+    'forgot-password': 'Forgot your password?',
+    'reset-password': 'Set a new password.',
+  }[mode];
+  const input = (key, props = {}) => (
+    <Field
+      label={key[0].toUpperCase() + key.slice(1)}
+      value={form[key]}
+      onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+      required
+      {...props}
+    />
+  );
+  async function submit(e) {
     e.preventDefault();
-    setGlobalError(null);
-    setFieldErrors({});
-
-    const errors = {};
-    if (!email.trim()) errors.email = 'Email is required to log in.';
-    if (!password) errors.password = 'Password is required to log in.';
-    
-    if (Object.keys(errors).length > 0) {
-      setFieldErrors(errors);
-      return;
-    }
-
-    setLoading(true);
+    setBusy(true);
+    setError('');
+    setMessage('');
     try {
-      const res = await auth.login({ email, password });
-      
-      if (res && res.token) {
-        localStorage.setItem('token', res.token);
-        if (res.user?.role) {
-          localStorage.setItem('role', res.user.role);
-        }
-        navigate('/');
-      } else {
-        setGlobalError('Login successful, but no token received. Please contact support.');
-      }
-    } catch (err) {
-      setGlobalError(err.message || 'Invalid credentials. Please check your email and password.');
-      if (err.fields) {
-        setFieldErrors(err.fields);
-      }
+      const result = await api('/auth/' + mode, {
+        method: 'POST',
+        body: { ...form, token: search.get('token') },
+      });
+      if (result.token) {
+        localStorage.setItem('token', result.token);
+        setUser(result.user);
+        navigate(result.user.role === 'customer' ? '/portal' : '/dashboard');
+      } else setMessage(result.message);
+    } catch (e) {
+      setError(e.message);
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
-  };
-
+  }
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-      <div className="panel" style={{ width: '100%', maxWidth: '400px' }}>
-        
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <h1 className="head" style={{ marginBottom: '8px' }}>Brightloop</h1>
-          <p style={{ color: 'var(--mute)' }}>Sign in to manage your workspace</p>
+    <div className="auth-shell">
+      <section className="auth-story">
+        <div className="brand">
+          <span className="brand-mark">b</span>brightloop.
         </div>
-
-        {globalError && (
-          <div style={{ backgroundColor: '#fbe8ec', color: 'var(--warn)', padding: '12px', borderRadius: '6px', marginBottom: '24px', fontSize: '0.9rem', fontWeight: 500 }}>
-            {globalError}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '20px' }}>
-            <label htmlFor="email">Email Address</label>
-            <input 
-              id="email"
-              type="email" 
-              placeholder="name@company.com" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={{ borderColor: fieldErrors.email ? 'var(--warn)' : 'var(--line)' }}
-            />
-            {fieldErrors.email && (
-              <div style={{ color: 'var(--warn)', fontSize: '0.8rem', marginTop: '6px' }}>{fieldErrors.email}</div>
+        <span className="eyebrow">ONE WORKSPACE. EVERY BILLING CYCLE.</span>
+        <h1>
+          Great relationships.
+          <br />
+          Recurring growth.
+        </h1>
+        <p>Keep your subscriptions, invoices and payments moving together.</p>
+        <div className="orbit">
+          <div className="orbit-core">b</div>
+          <span>Subscriptions</span>
+          <span>Invoices</span>
+          <span>Payments</span>
+        </div>
+        <small>Built for a clearer view of your business.</small>
+      </section>
+      <section className="auth-form">
+        <div className="auth-card">
+          <p className="eyebrow">YOUR WORKSPACE AWAITS</p>
+          <h1>{title}</h1>
+          <p className="muted">
+            {mode === 'login'
+              ? 'Sign in to your Brightloop account.'
+              : 'Secure access to your subscriptions and billing.'}
+          </p>
+          <Alert>{error}</Alert>
+          <Alert success>{message}</Alert>
+          <form onSubmit={submit}>
+            {mode === 'signup' && input('name', { autoComplete: 'name' })}
+            {mode !== 'reset-password' &&
+              input('email', { type: 'email', autoComplete: 'email' })}
+            {mode !== 'forgot-password' &&
+              input('password', {
+                type: 'password',
+                minLength: mode === 'login' ? 1 : 9,
+                autoComplete:
+                  mode === 'login' ? 'current-password' : 'new-password',
+              })}
+            {['signup', 'reset-password'].includes(mode) && (
+              <p className="muted small">
+                Use 9+ characters, uppercase, lowercase and a special character.
+              </p>
+            )}
+            <button className="btn" disabled={busy}>
+              {busy
+                ? 'Please wait…'
+                : {
+                    login: 'Sign in →',
+                    signup: 'Create account',
+                    'forgot-password': 'Send reset link',
+                    'reset-password': 'Update password',
+                  }[mode]}
+            </button>
+          </form>
+          <div className="auth-links">
+            {mode === 'login' ? (
+              <>
+                <Link to="/forgot-password">Forgot password?</Link>
+                <Link to="/signup">Create an account</Link>
+              </>
+            ) : (
+              <Link to="/login">Back to sign in</Link>
             )}
           </div>
-
-          <div style={{ marginBottom: '32px' }}>
-            <label htmlFor="password">Password</label>
-            <input 
-              id="password"
-              type="password" 
-              placeholder="••••••••" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{ borderColor: fieldErrors.password ? 'var(--warn)' : 'var(--line)' }}
-            />
-            {fieldErrors.password && (
-              <div style={{ color: 'var(--warn)', fontSize: '0.8rem', marginTop: '6px' }}>{fieldErrors.password}</div>
-            )}
-          </div>
-
-          <button 
-            type="submit" 
-            className="btn" 
-            style={{ width: '100%', justifyContent: 'center', padding: '12px' }}
-            disabled={loading}
-          >
-            {loading ? 'Signing in...' : 'Sign in'}
-          </button>
-        </form>
-        
-      </div>
+          {import.meta.env.DEV && mode === 'login' && (
+            <div className="demo">
+              <strong>Local demo access</strong>
+              <span>admin@brightloop.test</span>
+              <span>Password: Brightloop@123</span>
+              <small>
+                Staff/customer: change “admin” to “staff” or “customer”.
+              </small>
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
