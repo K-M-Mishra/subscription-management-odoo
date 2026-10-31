@@ -10,7 +10,7 @@ import Billing from './pages/Billing';
 import Discounts from './pages/Discounts';
 import Portal from './pages/Portal';
 import Auth from './pages/Auth';
-import Products from "./pages/Products";
+import Products from "./pages/Product";
 
 function App() {
   return (
