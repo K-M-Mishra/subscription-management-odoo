@@ -1,161 +1,123 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Head, Badge, Empty } from '../ui';
-import { money, formatDate } from '../data';
-import { invoices } from '../api';
-
+import { api, queryString } from '../api';
+import {
+  Head,
+  Field,
+  Table,
+  Badge,
+  Pager,
+  Alert,
+  Loading,
+  useLoad,
+  today,
+} from '../ui';
+import { money } from '../data';
 export default function Billing() {
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  
-  const [page, setPage] = useState(1);
-  const [limit] = useState(10);
-  const [total, setTotal] = useState(0);
-  const [statusFilter, setStatusFilter] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-
-  const fetchInvoices = async () => {
-    setLoading(true);
-    setError(null);
+  const [page, setPage] = useState(1),
+    [q, setQ] = useState(''),
+    [status, setStatus] = useState(''),
+    [error, setError] = useState(''),
+    [message, setMessage] = useState(''),
+    [busy, setBusy] = useState(false);
+  const load = useLoad(
+    () => api('/invoices' + queryString({ page, q, status })),
+    [page, q, status],
+  );
+  async function run() {
+    setBusy(true);
+    setError('');
     try {
-      const res = await invoices.list({
-        page,
-        limit,
-        status: statusFilter,
-        q: searchQuery
-      });
-      setData(res?.data || res || []);
-      setTotal(res?.total || 0);
-    } catch (err) {
-      setError(err.message || 'Failed to load invoices.');
+      const r = await api('/billing/run', { method: 'POST', body: {} });
+      setMessage(r.message);
+      load.reload();
+    } catch (e) {
+      setError(e.message);
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
-  };
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      fetchInvoices();
-    }, 300);
-    return () => clearTimeout(handler);
-  }, [page, statusFilter, searchQuery]);
-
-  const getStatusBadge = (status) => {
-    const s = (status || '').toLowerCase();
-    switch (s) {
-      case 'paid': return <Badge type="ok">Paid</Badge>;
-      case 'draft': return <Badge type="mute">Draft</Badge>;
-      case 'confirmed': return <Badge type="default">Confirmed</Badge>;
-      case 'cancelled': return <Badge type="warn">Cancelled</Badge>;
-      default: return <Badge type="default">{status || 'Unknown'}</Badge>;
-    }
-  };
-
+  }
   return (
-    <div>
-      <Head 
-        title="Invoices & Billing" 
-        subtitle="Track payments, outstanding balances, and billing history."
-        actions={<button className="btn">Create Invoice</button>}
+    <>
+      <Head
+        title="Billing & invoices"
+        subtitle="Recurring billing runs every minute while the server is running. You can also run it now."
+        actions={
+          <button className="btn" disabled={busy} onClick={run}>
+            {busy ? 'Generating…' : 'Run due billing'}
+          </button>
+        }
       />
-
-      <div className="panel">
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
-          <div style={{ flex: '1', minWidth: '200px' }}>
-            <label style={{ display: 'none' }}>Search</label>
-            <input 
-              type="text" 
-              placeholder="Search by invoice # or customer..." 
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-            />
-          </div>
-          <div style={{ width: '180px' }}>
-            <label style={{ display: 'none' }}>Status Filter</label>
-            <select 
-              value={statusFilter} 
-              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            >
-              <option value="">All Statuses</option>
-              <option value="draft">Draft</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="paid">Paid</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </div>
-        </div>
-
-        {loading && data.length === 0 ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--mute)' }}>Loading invoices...</div>
-        ) : error ? (
-          <Empty title="Error" description={error} actionText="Retry" onAction={fetchInvoices} />
-        ) : data.length === 0 ? (
-          <Empty 
-            title="No invoices found" 
-            description="Adjust your search filters or generate a new invoice."
-          />
-        ) : (
-          <>
-            <div style={{ overflowX: 'auto' }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Invoice #</th>
-                    <th>Customer</th>
-                    <th>Issue Date</th>
-                    <th>Due Date</th>
-                    <th>Amount</th>
-                    <th>Status</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.map((inv) => (
-                    <tr key={inv.id}>
-                      <td style={{ fontWeight: 500 }}>{inv.invoiceNumber || inv.id}</td>
-                      <td>{inv.customerName || '-'}</td>
-                      <td>{formatDate(inv.issueDate)}</td>
-                      <td style={{ color: 'var(--mute)' }}>{formatDate(inv.dueDate)}</td>
-                      <td style={{ fontWeight: 600 }}>{money(inv.amount)}</td>
-                      <td>{getStatusBadge(inv.status)}</td>
-                      <td>
-                        <Link to={`/invoices/${inv.id}`} className="btn mini" style={{ background: 'var(--line)', color: 'var(--ink)', textDecoration: 'none' }}>
-                          View
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--line)' }}>
-              <span style={{ fontSize: '0.9rem', color: 'var(--mute)' }}>
-                Showing page {page} {total > 0 ? `of ${Math.ceil(total / limit)}` : ''}
-              </span>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button 
-                  className="btn mini" 
-                  style={{ background: 'var(--line)', color: 'var(--ink)' }}
-                  disabled={page === 1}
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                >
-                  Previous
-                </button>
-                <button 
-                  className="btn mini" 
-                  style={{ background: 'var(--line)', color: 'var(--ink)' }}
-                  disabled={data.length < limit}
-                  onClick={() => setPage(p => p + 1)}
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          </>
-        )}
+      <Alert>{error}</Alert>
+      <Alert success>{message}</Alert>
+      <div className="filters">
+        <Field
+          label="Search"
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setPage(1);
+          }}
+        />
+        <Field label="Status">
+          <select
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">All statuses</option>
+            {['Draft', 'Confirmed', 'Paid', 'Cancelled'].map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </select>
+        </Field>
       </div>
-    </div>
+      <Loading load={load}>
+        <section className="panel">
+          <Table
+            rows={load.data?.data}
+            columns={[
+              {
+                key: 'invoiceNumber',
+                label: 'Invoice',
+                render: (i) => (
+                  <Link to={'/invoices/' + i.id}>{i.invoiceNumber}</Link>
+                ),
+              },
+              { key: 'customerName', label: 'Customer' },
+              {
+                key: 'dueDate',
+                label: 'Due date',
+                render: (i) => (
+                  <span
+                    className={
+                      i.status === 'Confirmed' && i.dueDate < today()
+                        ? 'danger'
+                        : ''
+                    }
+                  >
+                    {i.dueDate}
+                  </span>
+                ),
+              },
+              { key: 'amount', label: 'Total', render: (i) => money(i.amount) },
+              {
+                key: 'balance',
+                label: 'Balance',
+                render: (i) => money(i.balance),
+              },
+              {
+                key: 'status',
+                label: 'Status',
+                render: (i) => <Badge>{i.status}</Badge>,
+              },
+            ]}
+          />
+          <Pager data={load.data} page={page} setPage={setPage} />
+        </section>
+      </Loading>
+    </>
   );
 }
