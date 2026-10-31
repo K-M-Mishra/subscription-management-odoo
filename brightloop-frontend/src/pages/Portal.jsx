@@ -1,170 +1,155 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Head, Empty, Badge, Stepper } from '../ui';
+import { Head, Badge, Empty } from '../ui';
 import { money, formatDate } from '../data';
-import { getPortalSubscriptions, getPortalInvoices, downloadPortalInvoice } from '../api';
+import { subscriptions } from '../api';
 
-const STATUS_STEPS = ['Draft', 'Quotation', 'Confirmed', 'Active', 'Closed'];
-
-export default function Portal() {
-  const [subscriptions, setSubscriptions] = useState([]);
-  const [invoices, setInvoices] = useState([]);
+export default function Subscriptions() {
+  const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const fetchData = async () => {
+  const fetchSubscriptions = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [subsRes, invsRes] = await Promise.all([
-        getPortalSubscriptions({ limit: 50 }),
-        getPortalInvoices({ limit: 50 })
-      ]);
-      
-      setSubscriptions(subsRes?.data || subsRes || []);
-      setInvoices(invsRes?.data || invsRes || []);
+      const res = await subscriptions.list({
+        page,
+        limit,
+        status: statusFilter,
+        q: searchQuery
+      });
+      setData(res?.data || res || []);
+      setTotal(res?.total || 0);
     } catch (err) {
-      setError('We had trouble loading your account details. Please try refreshing the page.');
+      setError(err.message || 'Failed to load subscriptions.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    const handler = setTimeout(() => {
+      fetchSubscriptions();
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [page, statusFilter, searchQuery]);
 
-  const handleDownload = async (invoiceId, invoiceNumber) => {
-    try {
-      const blob = await downloadPortalInvoice(invoiceId);
-      const url = window.URL.createObjectURL(new Blob([blob]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `Invoice-${invoiceNumber}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.parentNode.removeChild(link);
-    } catch (err) {
-      alert('We could not download your invoice right now. Please try again later.');
+  const getStatusBadge = (status) => {
+    const s = (status || '').toLowerCase();
+    switch (s) {
+      case 'active': return <Badge type="ok">Active</Badge>;
+      case 'draft': return <Badge type="mute">Draft</Badge>;
+      case 'quotation': return <Badge type="warn">Quotation</Badge>;
+      case 'confirmed': return <Badge type="default">Confirmed</Badge>;
+      case 'closed': return <Badge type="mute">Closed</Badge>;
+      default: return <Badge type="default">{status || 'Unknown'}</Badge>;
     }
   };
 
-  if (loading) {
-    return <div style={{ padding: '48px', textAlign: 'center', color: 'var(--mute)' }}>Gathering your account details...</div>;
-  }
-
-  if (error) {
-    return <Empty title="Something went wrong" description={error} actionText="Refresh page" onAction={fetchData} />;
-  }
-
   return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+    <div>
       <Head 
-        title="My Account" 
-        description="Welcome back. Here is an overview of your subscriptions and billing history."
+        title="Subscriptions" 
+        subtitle="Manage customer plans and billing cycles."
+        actions={<button className="btn">Create subscription</button>}
       />
 
-      <div style={{ marginBottom: '40px' }}>
-        <h2 style={{ fontSize: '20px', fontFamily: 'Bricolage Grotesque', marginBottom: '16px' }}>My Subscriptions</h2>
-        
-        {subscriptions.length === 0 ? (
-          <div className="panel" style={{ textAlign: 'center', padding: '32px' }}>
-            <p style={{ color: 'var(--mute)', margin: 0 }}>You don't have any subscriptions with us yet.</p>
+      <div className="panel">
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+          <div style={{ flex: '1', minWidth: '200px' }}>
+            <label style={{ display: 'none' }}>Search</label>
+            <input 
+              type="text" 
+              placeholder="Search by customer or ID..." 
+              value={searchQuery}
+              onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+            />
           </div>
+          <div style={{ width: '180px' }}>
+            <label style={{ display: 'none' }}>Status Filter</label>
+            <select 
+              value={statusFilter} 
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+            >
+              <option value="">All Statuses</option>
+              <option value="draft">Draft</option>
+              <option value="quotation">Quotation</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="active">Active</option>
+              <option value="closed">Closed</option>
+            </select>
+          </div>
+        </div>
+
+        {loading && data.length === 0 ? (
+          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--mute)' }}>Loading subscriptions...</div>
+        ) : error ? (
+          <Empty title="Error" description={error} actionText="Retry" onAction={fetchSubscriptions} />
+        ) : data.length === 0 ? (
+          <Empty 
+            title="No subscriptions found" 
+            description="Try adjusting your filters or create a new subscription."
+          />
         ) : (
-          <div className="grid2">
-            {subscriptions.map(sub => {
-              const currentStep = STATUS_STEPS.indexOf(sub.status) >= 0 ? STATUS_STEPS.indexOf(sub.status) : 3;
-              
-              return (
-                <div key={sub.id} className="panel" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <h3 style={{ margin: 0, fontSize: '18px', fontFamily: 'Bricolage Grotesque' }}>
-                        {sub.productName || 'Subscription'}
-                      </h3>
-                      <div style={{ color: 'var(--mute)', fontSize: '14px', marginTop: '4px' }}>
-                        {sub.planName} Plan
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'right', fontWeight: '600', color: 'var(--ink)' }}>
-                      {money(sub.amount)}
-                    </div>
-                  </div>
-
-                  <div style={{ padding: '16px 0', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
-                    <Stepper steps={STATUS_STEPS} currentStep={currentStep} />
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
-                    <div style={{ fontSize: '14px', color: 'var(--mute)' }}>
-                      {sub.nextBillingDate ? (
-                        <>Next bill on <strong>{formatDate(sub.nextBillingDate)}</strong></>
-                      ) : (
-                        'No upcoming bills'
-                      )}
-                    </div>
-                    <Link to={`/portal/subscriptions/${sub.id}`} className="btn mini">
-                      View details
-                    </Link>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <div>
-        <h2 style={{ fontSize: '20px', fontFamily: 'Bricolage Grotesque', marginBottom: '16px' }}>Billing History</h2>
-        
-        <div className="panel">
-          <div className="table-wrapper">
-            {invoices.length === 0 ? (
-              <p style={{ color: 'var(--mute)', margin: 0, textAlign: 'center', padding: '16px' }}>
-                You have no invoices at this time.
-              </p>
-            ) : (
+          <>
+            <div style={{ overflowX: 'auto' }}>
               <table>
                 <thead>
                   <tr>
-                    <th>Invoice No.</th>
-                    <th>Date</th>
+                    <th>ID</th>
+                    <th>Customer</th>
+                    <th>Plan</th>
                     <th>Amount</th>
                     <th>Status</th>
-                    <th style={{ textAlign: 'right' }}>Actions</th>
+                    <th>Created</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {invoices.map(invoice => (
-                    <tr key={invoice.id}>
-                      <td style={{ fontWeight: '500' }}>{invoice.invoiceNumber}</td>
-                      <td>{formatDate(invoice.date)}</td>
-                      <td style={{ fontWeight: '600' }}>{money(invoice.amount)}</td>
-                      <td>
-                        <Badge type={
-                          invoice.status === 'Paid' ? 'ok' :
-                          invoice.status === 'Cancelled' ? 'warn' : 'default'
-                        }>
-                          {invoice.status}
-                        </Badge>
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <button 
-                          onClick={() => handleDownload(invoice.id, invoice.invoiceNumber)}
-                          className="btn mini" 
-                          style={{ backgroundColor: 'var(--paper)', color: 'var(--ink)', border: '1px solid var(--line)' }}
-                        >
-                          Download PDF
-                        </button>
-                      </td>
+                  {data.map((sub) => (
+                    <tr key={sub.id}>
+                      <td style={{ fontWeight: 500 }}>{sub.subscriptionNumber || sub.id}</td>
+                      <td>{sub.customerName || '-'}</td>
+                      <td>{sub.planName || '-'}</td>
+                      <td style={{ fontWeight: 600 }}>{money(sub.amount)}</td>
+                      <td>{getStatusBadge(sub.status)}</td>
+                      <td style={{ color: 'var(--mute)' }}>{formatDate(sub.createdAt)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            )}
-          </div>
-        </div>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--line)' }}>
+              <span style={{ fontSize: '0.9rem', color: 'var(--mute)' }}>
+                Showing page {page} {total > 0 ? `of ${Math.ceil(total / limit)}` : ''}
+              </span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button 
+                  className="btn mini" 
+                  style={{ background: 'var(--line)', color: 'var(--ink)' }}
+                  disabled={page === 1}
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                >
+                  Previous
+                </button>
+                <button 
+                  className="btn mini" 
+                  style={{ background: 'var(--line)', color: 'var(--ink)' }}
+                  disabled={data.length < limit}
+                  onClick={() => setPage(p => p + 1)}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
