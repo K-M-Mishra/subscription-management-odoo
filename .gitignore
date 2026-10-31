@@ -1,0 +1,27 @@
+<<<<<<< HEAD
+
+# Brightloop shared ignore rules
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+
+.env
+.env.*
+!.env.example
+!.env.sample
+
+*.log
+logs/
+.DS_Store
+=======
+node_modules/
+dist/
+.env
+.env.*
+*.log
+.DS_Store
+!.env.example
+!.env.example
+>>>>>>> feat/auth-pages
