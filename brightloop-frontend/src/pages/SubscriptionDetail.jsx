@@ -1,209 +1,267 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Head, Badge, Stepper, Empty } from '../ui';
-import { money, formatDate } from '../data';
-import { subscriptions } from '../api';
-
-const STATUS_STEPS = ['Draft', 'Quotation', 'Confirmed', 'Active', 'Closed'];
-
-export default function SubscriptionDetail() {
-  const { id } = useParams(); // URL se ID nikalne ke liye
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [moving, setMoving] = useState(false);
-  
-  // Tabs manage karne ke liye state
-  const [activeTab, setActiveTab] = useState('lines'); // 'lines' ya 'invoices'
-
-  const fetchData = async () => {
-    setLoading(true);
-    setError(null);
+import { api } from '../api';
+import { Head, Field, Table, Badge, Loading, Alert, useLoad } from '../ui';
+import { money } from '../data';
+export default function SubscriptionDetail({ portal = false }) {
+  const { id } = useParams(),
+    base = portal ? '/portal' : '',
+    load = useLoad(() => api(base + '/subscriptions/' + id), [id, portal]);
+  const s = load.data;
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState(''),
+    [message, setMessage] = useState(''),
+    [expiry, setExpiry] = useState('');
+  async function action(path, method, body) {
+    setBusy(true);
+    setError('');
+    setMessage('');
     try {
-      const res = await subscriptions.get(id);
-      setData(res?.data || res);
-    } catch (err) {
-      setError(err.message || 'Failed to load subscription details.');
+      const r = await api(path, { method, body });
+      if (r.message) setMessage(r.message);
+      load.reload();
+    } catch (e) {
+      setError(e.message);
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, [id]);
-
-  // "Move to next status" ka logic
-  const handleMoveStatus = async () => {
-    if (!data || !data.status) return;
-    
-    const currentLower = data.status.toLowerCase();
-    const currentIndex = STATUS_STEPS.findIndex(s => s.toLowerCase() === currentLower);
-    
-    if (currentIndex === -1 || currentIndex >= STATUS_STEPS.length - 1) return;
-    const nextStatus = STATUS_STEPS[currentIndex + 1].toLowerCase();
-
-    setMoving(true);
-    try {
-      await subscriptions.updateStatus(id, nextStatus);
-      await fetchData(); // Status change hone par naya data fetch karo
-    } catch (err) {
-      alert(err.message || 'Failed to move status.');
-    } finally {
-      setMoving(false);
-    }
-  };
-
-  if (loading && !data) {
-    return <div style={{ padding: '48px', textAlign: 'center', color: 'var(--mute)' }}>Loading details...</div>;
   }
-
-  if (error) {
-    return <Empty title="Error" description={error} actionText="Retry" onAction={fetchData} />;
-  }
-
-  if (!data) return null;
-
-  // Stepper aur button ke liye status calculation
-  const currentStatusLower = (data.status || 'draft').toLowerCase();
-  const currentStepIndex = STATUS_STEPS.findIndex(s => s.toLowerCase() === currentStatusLower);
-  const isClosed = currentStatusLower === 'closed';
-  const nextStatusName = !isClosed && currentStepIndex !== -1 ? STATUS_STEPS[currentStepIndex + 1] : null;
-
+  const next = {
+    Draft: 'Quotation',
+    Quotation: 'Confirmed',
+    Confirmed: 'Active',
+  }[s?.status];
   return (
-    <div>
-      {/* Header with Details */}
-      <Head 
-        title={`Subscription #${data.subscriptionNumber || id}`}
-        subtitle="View full details, billing lines, and status history."
-        actions={
-          nextStatusName && (
-            <button className="btn" onClick={handleMoveStatus} disabled={moving}>
-              {moving ? 'Moving...' : `Move to ${nextStatusName}`}
-            </button>
-          )
-        }
+    <>
+      <Head
+        title={s?.number || 'Subscription details'}
+        subtitle={s ? `${s.customerName} · ${s.planName}` : ''}
       />
-
-      <div className="panel" style={{ marginBottom: '24px' }}>
-        {/* Visual Stepper */}
-        <Stepper steps={STATUS_STEPS} currentStep={currentStepIndex === -1 ? 0 : currentStepIndex} />
-        
-        {/* Core Info Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '24px', marginTop: '32px', paddingTop: '24px', borderTop: '1px solid var(--line)' }}>
-          <div>
-            <p style={{ color: 'var(--mute)', fontSize: '0.85rem', marginBottom: '4px' }}>Customer</p>
-            <p style={{ fontWeight: 600 }}>{data.customerName || 'Unknown Customer'}</p>
-          </div>
-          <div>
-            <p style={{ color: 'var(--mute)', fontSize: '0.85rem', marginBottom: '4px' }}>Plan</p>
-            <p style={{ fontWeight: 500 }}>{data.planName || 'N/A'}</p>
-          </div>
-          <div>
-            <p style={{ color: 'var(--mute)', fontSize: '0.85rem', marginBottom: '4px' }}>Start Date</p>
-            <p>{formatDate(data.startDate)}</p>
-          </div>
-          <div>
-            <p style={{ color: 'var(--mute)', fontSize: '0.85rem', marginBottom: '4px' }}>Payment Terms</p>
-            <p>{data.paymentTerms || 'Net 30'}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs UI */}
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', borderBottom: '1px solid var(--line)' }}>
-        <button 
-          onClick={() => setActiveTab('lines')}
-          style={{ background: 'none', border: 'none', padding: '8px 16px', cursor: 'pointer', borderBottom: activeTab === 'lines' ? '2px solid var(--loop)' : '2px solid transparent', color: activeTab === 'lines' ? 'var(--loop)' : 'var(--mute)', fontWeight: 600 }}
-        >
-          Order Lines
-        </button>
-        <button 
-          onClick={() => setActiveTab('invoices')}
-          style={{ background: 'none', border: 'none', padding: '8px 16px', cursor: 'pointer', borderBottom: activeTab === 'invoices' ? '2px solid var(--loop)' : '2px solid transparent', color: activeTab === 'invoices' ? 'var(--loop)' : 'var(--mute)', fontWeight: 600 }}
-        >
-          Linked Invoices
-        </button>
-      </div>
-
-      {/* Tab Content */}
-      <div className="panel">
-        {activeTab === 'lines' && (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ minWidth: '600px' }}>
-              <thead>
-                <tr>
-                  <th>Product</th>
-                  <th style={{ textAlign: 'right' }}>Qty</th>
-                  <th style={{ textAlign: 'right' }}>Unit Price</th>
-                  <th style={{ textAlign: 'right' }}>Tax</th>
-                  <th style={{ textAlign: 'right' }}>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(!data.lines || data.lines.length === 0) ? (
-                  <tr>
-                    <td colSpan="5" style={{ textAlign: 'center', padding: '24px', color: 'var(--mute)' }}>No order lines found.</td>
-                  </tr>
-                ) : (
-                  data.lines.map((line, idx) => (
-                    <tr key={idx}>
-                      <td>{line.productName}</td>
-                      <td style={{ textAlign: 'right' }}>{line.quantity}</td>
-                      <td style={{ textAlign: 'right' }}>{money(line.unitPrice)}</td>
-                      <td style={{ textAlign: 'right' }}>{money(line.taxAmount)}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 600 }}>{money(line.totalAmount)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-              {data.lines && data.lines.length > 0 && (
-                <tfoot style={{ borderTop: '2px solid var(--line)' }}>
-                  <tr>
-                    <td colSpan="4" style={{ textAlign: 'right', fontWeight: 600, padding: '16px' }}>Total Amount:</td>
-                    <td style={{ textAlign: 'right', fontWeight: 700, padding: '16px', color: 'var(--loop)' }}>{money(data.amount)}</td>
-                  </tr>
-                </tfoot>
+      <Alert>{error}</Alert>
+      <Alert success>{message}</Alert>
+      <Loading load={load}>
+        {s && (
+          <>
+            <div className="workflow">
+              {['Draft', 'Quotation', 'Confirmed', 'Active', 'Closed'].map(
+                (v) => (
+                  <span key={v} className={s.status === v ? 'current' : ''}>
+                    {v}
+                  </span>
+                ),
               )}
-            </table>
-          </div>
-        )}
-
-        {activeTab === 'invoices' && (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ minWidth: '600px' }}>
-              <thead>
-                <tr>
-                  <th>Invoice #</th>
-                  <th>Date</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(!data.invoices || data.invoices.length === 0) ? (
-                  <tr>
-                    <td colSpan="5" style={{ textAlign: 'center', padding: '24px', color: 'var(--mute)' }}>No invoices generated yet.</td>
-                  </tr>
-                ) : (
-                  data.invoices.map((inv) => (
-                    <tr key={inv.id}>
-                      <td style={{ fontWeight: 500 }}>{inv.invoiceNumber}</td>
-                      <td>{formatDate(inv.issueDate)}</td>
-                      <td style={{ fontWeight: 600 }}>{money(inv.amount)}</td>
-                      <td><Badge>{inv.status}</Badge></td>
-                      <td>
-                        <Link to={`/invoices/${inv.id}`} className="btn mini">View</Link>
-                      </td>
-                    </tr>
-                  ))
+              {s.status === 'Paused' && <Badge>Paused</Badge>}
+            </div>
+            <section className="panel">
+              <div className="section-head">
+                <h2>{s.customerName}</h2>
+                <Badge>{s.status}</Badge>
+              </div>
+              <div className="detail-grid">
+                <div>
+                  <small>Start date</small>
+                  <strong>{s.startDate}</strong>
+                </div>
+                <div>
+                  <small>Expiry date</small>
+                  <strong>{s.expiryDate || 'Open-ended'}</strong>
+                </div>
+                <div>
+                  <small>Billing cycle</small>
+                  <strong>{s.plan.interval}</strong>
+                </div>
+                <div>
+                  <small>Next billing</small>
+                  <strong>
+                    {s.status === 'Active' ? s.nextBillingDate : '—'}
+                  </strong>
+                </div>
+                <div>
+                  <small>Payment terms</small>
+                  <strong>{s.paymentTerms}</strong>
+                </div>
+                <div>
+                  <small>Per cycle before discounts</small>
+                  <strong>{money(s.amount)}</strong>
+                </div>
+              </div>
+              {s.quoteValidUntil && (
+                <p className="muted">
+                  Quotation valid through {s.quoteValidUntil}
+                </p>
+              )}
+              <div className="actions">
+                {!portal && next && (
+                  <button
+                    className="btn"
+                    disabled={busy}
+                    onClick={() =>
+                      action(
+                        base + '/subscriptions/' + id + '/status',
+                        'PATCH',
+                        { status: next },
+                      )
+                    }
+                  >
+                    Move to {next}
+                  </button>
                 )}
-              </tbody>
-            </table>
-          </div>
+                {s.status === 'Active' && s.plan.allowPause && (
+                  <button
+                    className="btn secondary"
+                    disabled={busy}
+                    onClick={() =>
+                      action(
+                        base + '/subscriptions/' + id + '/status',
+                        'PATCH',
+                        { status: 'Paused' },
+                      )
+                    }
+                  >
+                    Pause
+                  </button>
+                )}
+                {s.status === 'Paused' && (
+                  <button
+                    className="btn"
+                    disabled={busy}
+                    onClick={() =>
+                      action(
+                        base + '/subscriptions/' + id + '/status',
+                        'PATCH',
+                        { status: 'Active' },
+                      )
+                    }
+                  >
+                    Resume
+                  </button>
+                )}
+                {['Active', 'Paused'].includes(s.status) &&
+                  s.plan.allowClose && (
+                    <button
+                      className="btn secondary danger"
+                      disabled={busy}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            'Close this subscription? New billing will stop.',
+                          )
+                        )
+                          action(
+                            base + '/subscriptions/' + id + '/status',
+                            'PATCH',
+                            { status: 'Closed' },
+                          );
+                      }}
+                    >
+                      Close subscription
+                    </button>
+                  )}
+                {!portal && s.status === 'Active' && (
+                  <button
+                    className="btn secondary"
+                    disabled={busy}
+                    onClick={() => action('/billing/run', 'POST', {})}
+                  >
+                    Run due billing
+                  </button>
+                )}
+              </div>
+            </section>
+            <section className="panel">
+              <h2>Order lines</h2>
+              <Table
+                rows={s.lines.map((l, i) => ({ ...l, id: i }))}
+                columns={[
+                  {
+                    key: 'productName',
+                    label: 'Product',
+                    render: (l) =>
+                      l.productName +
+                      (l.variantName ? ' / ' + l.variantName : ''),
+                  },
+                  { key: 'quantity', label: 'Quantity' },
+                  {
+                    key: 'unitPrice',
+                    label: 'Unit price',
+                    render: (l) => money(l.unitPrice),
+                  },
+                  {
+                    key: 'taxRate',
+                    label: 'Tax',
+                    render: (l) => l.taxRate + '%',
+                  },
+                  {
+                    key: 'totalAmount',
+                    label: 'Line total',
+                    render: (l) => money(l.totalAmount),
+                  },
+                ]}
+              />
+            </section>
+            {s.plan.allowRenew &&
+              ['Active', 'Paused', 'Closed'].includes(s.status) && (
+                <section className="panel">
+                  <h2>Renew subscription</h2>
+                  <div className="filters">
+                    <Field
+                      label="New expiry date"
+                      type="date"
+                      value={expiry}
+                      onChange={(e) => setExpiry(e.target.value)}
+                    />
+                    <button
+                      className="btn secondary"
+                      disabled={busy || !expiry}
+                      onClick={() =>
+                        action(
+                          base + '/subscriptions/' + id + '/renew',
+                          'POST',
+                          { expiryDate: expiry },
+                        )
+                      }
+                    >
+                      Renew
+                    </button>
+                  </div>
+                </section>
+              )}
+            <section className="panel">
+              <h2>Linked invoices</h2>
+              <Table
+                rows={s.invoices}
+                columns={[
+                  {
+                    key: 'invoiceNumber',
+                    label: 'Invoice',
+                    render: (i) => (
+                      <Link to={base + '/invoices/' + i.id}>
+                        {i.invoiceNumber}
+                      </Link>
+                    ),
+                  },
+                  { key: 'issueDate', label: 'Issued' },
+                  {
+                    key: 'amount',
+                    label: 'Total',
+                    render: (i) => money(i.amount),
+                  },
+                  {
+                    key: 'balance',
+                    label: 'Balance',
+                    render: (i) => money(i.balance),
+                  },
+                  {
+                    key: 'status',
+                    label: 'Status',
+                    render: (i) => <Badge>{i.status}</Badge>,
+                  },
+                ]}
+              />
+            </section>
+          </>
         )}
-      </div>
-    </div>
+      </Loading>
+    </>
   );
 }
