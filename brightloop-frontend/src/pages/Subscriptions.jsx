@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { Head, Badge, Empty } from '../ui';
 import { money, formatDate } from '../data';
 import { subscriptions } from '../api';
@@ -9,12 +8,10 @@ export default function Subscriptions() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Pagination & Filters
   const [page, setPage] = useState(1);
-  const [limit] = useState(10); 
+  const [limit] = useState(10);
   const [total, setTotal] = useState(0);
   const [statusFilter, setStatusFilter] = useState('');
-  const [planFilter, setPlanFilter] = useState(''); 
   const [searchQuery, setSearchQuery] = useState('');
 
   const fetchSubscriptions = async () => {
@@ -25,7 +22,6 @@ export default function Subscriptions() {
         page,
         limit,
         status: statusFilter,
-        plan: planFilter,
         q: searchQuery
       });
       setData(res?.data || res || []);
@@ -42,7 +38,7 @@ export default function Subscriptions() {
       fetchSubscriptions();
     }, 300);
     return () => clearTimeout(handler);
-  }, [page, statusFilter, planFilter, searchQuery]);
+  }, [page, statusFilter, searchQuery]);
 
   const getStatusBadge = (status) => {
     const s = (status || '').toLowerCase();
@@ -52,7 +48,7 @@ export default function Subscriptions() {
       case 'quotation': return <Badge type="warn">Quotation</Badge>;
       case 'confirmed': return <Badge type="default">Confirmed</Badge>;
       case 'closed': return <Badge type="mute">Closed</Badge>;
-      default: return <Badge>{status || 'Unknown'}</Badge>;
+      default: return <Badge type="default">{status || 'Unknown'}</Badge>;
     }
   };
 
@@ -61,11 +57,7 @@ export default function Subscriptions() {
       <Head 
         title="Subscriptions" 
         subtitle="Manage customer plans and billing cycles."
-        actions={
-          <Link to="/subscriptions/new" className="btn" style={{ textDecoration: 'none' }}>
-            Create subscription
-          </Link>
-        }
+        actions={<button className="btn">Create subscription</button>}
       />
 
       <div className="panel">
@@ -79,20 +71,6 @@ export default function Subscriptions() {
               onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
             />
           </div>
-          
-          <div style={{ width: '180px' }}>
-            <label style={{ display: 'none' }}>Plan Filter</label>
-            <select 
-              value={planFilter} 
-              onChange={(e) => { setPlanFilter(e.target.value); setPage(1); }}
-            >
-              <option value="">All Plans</option>
-              <option value="basic">Basic Plan</option>
-              <option value="pro">Pro Plan</option>
-              <option value="enterprise">Enterprise Plan</option>
-            </select>
-          </div>
-
           <div style={{ width: '180px' }}>
             <label style={{ display: 'none' }}>Status Filter</label>
             <select 
@@ -130,7 +108,6 @@ export default function Subscriptions() {
                     <th>Amount</th>
                     <th>Status</th>
                     <th>Created</th>
-                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -142,11 +119,6 @@ export default function Subscriptions() {
                       <td style={{ fontWeight: 600 }}>{money(sub.amount)}</td>
                       <td>{getStatusBadge(sub.status)}</td>
                       <td style={{ color: 'var(--mute)' }}>{formatDate(sub.createdAt)}</td>
-                      <td>
-                        <Link to={`/subscriptions/${sub.id}`} className="btn mini" style={{ background: 'var(--line)', color: 'var(--ink)', textDecoration: 'none' }}>
-                          View
-                        </Link>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
