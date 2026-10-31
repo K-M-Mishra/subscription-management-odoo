@@ -1,6 +1,7 @@
-import { Router } from 'express'
-import { HttpError } from '../middleware/error.js'
-// Endpoints: docs/API_CONTRACT.md. Is stub ko apne code se REPLACE karo.
-const router = Router()
-router.use((req, res, next) => next(new HttpError(501, 'not_implemented', 'billing endpoints are not built yet.')))
-export default router
+import { Router } from 'express';
+import { runBilling } from '../domain.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
+const router = Router();
+router.use(requireAuth, requireRole('admin', 'staff'));
+router.post('/run', (req, res) => res.json(runBilling()));
+export default router;
