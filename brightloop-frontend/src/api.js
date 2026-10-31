@@ -34,6 +34,7 @@ async function request(endpoint, options = {}) {
 
   const response = await fetch(`${BASE_URL}${endpoint}`, config);
 
+  // Auto logout on token expiration
   if (response.status === 401) {
     localStorage.removeItem('token');
     window.location.href = '/login';
@@ -58,8 +59,9 @@ async function request(endpoint, options = {}) {
   return data; 
 }
 
-// --- ENDPOINTS ---
-
+// ==========================================
+// OBJECT NAMESPACES (Kept for compatibility)
+// ==========================================
 export const auth = {
   login: (credentials) => request('/auth/login', { method: 'POST', body: credentials }),
   me: () => request('/auth/me'),
@@ -117,26 +119,36 @@ export const payments = {
 };
 
 // ==========================================
-// REPORTS (Finance dashboard) - Added from GitHub Sync
+// FLAT FUNCTIONS (Bridging UI Components)
 // ==========================================
-export const reports = {
-  finance: () => request('/reports/finance'),
-};
-// Flat functions for Dashboard component compatibility
+export const fetchProducts = (params) => request(`/products${buildQuery(params)}`);
+export const saveProduct = (data) => request(data.id ? `/products/${data.id}` : '/products', { method: data.id ? 'PUT' : 'POST', body: data });
+
+export const getPlans = (params) => request(`/plans${buildQuery(params)}`);
+export const createPlan = (data) => request('/plans', { method: 'POST', body: data });
+
+export const getPayments = (params) => request(`/payments${buildQuery(params)}`);
+export const recordPayment = (data) => request('/payments', { method: 'POST', body: data });
+
+export const changeSubscriptionStatus = (id, data) => request(`/subscriptions/${id}/status`, { method: 'PATCH', body: data });
+
+// Reports for Dashboard
 export const getSummary = (params) => request(`/reports/summary${buildQuery(params)}`);
 export const getRevenue = (params) => request(`/reports/revenue${buildQuery(params)}`);
 export const getOverdue = (params) => request(`/reports/overdue${buildQuery(params)}`);
-export const getDashboardStats = (params) => request(`/reports/dashboard${buildQuery(params)}`);
-export const getRevenueReport = (params) => request(`/reports/revenue-report${buildQuery(params)}`);
 
-// ==========================================
-// PORTAL (Customer-facing endpoints)
-// ==========================================
-export const portal = {
-  mySubscriptions: (params) => request(`/portal/subscriptions${buildQuery(params)}`),
-  myInvoices: (params) => request(`/portal/invoices${buildQuery(params)}`),
-};
+// Portal (Customer-facing endpoints)
 export const getPortalSubscriptions = (params) => request(`/portal/subscriptions${buildQuery(params)}`);
 export const getPortalSubscription = (id) => request(`/portal/subscriptions/${id}`);
 export const getPortalInvoices = (params) => request(`/portal/invoices${buildQuery(params)}`);
-export const getPortalInvoice = (id) => request(`/portal/invoices/${id}`);
+
+// Custom Blob function specifically for PDF downloads
+export const downloadPortalInvoice = async (id) => {
+  const token = localStorage.getItem('token');
+  const headers = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const response = await fetch(`${BASE_URL}/portal/invoices/${id}/download`, { headers });
+  if (!response.ok) throw new Error('Failed to download invoice');
+  return response.blob(); 
+};
