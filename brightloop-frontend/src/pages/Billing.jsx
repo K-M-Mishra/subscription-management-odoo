@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Head, Badge, Empty } from '../ui';
 import { money, formatDate } from '../data';
 import { invoices } from '../api';
@@ -8,7 +9,6 @@ export default function Billing() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Pagination & Filters
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
   const [total, setTotal] = useState(0);
@@ -48,7 +48,7 @@ export default function Billing() {
       case 'draft': return <Badge type="mute">Draft</Badge>;
       case 'confirmed': return <Badge type="default">Confirmed</Badge>;
       case 'cancelled': return <Badge type="warn">Cancelled</Badge>;
-      default: return <Badge>{status || 'Unknown'}</Badge>;
+      default: return <Badge type="default">{status || 'Unknown'}</Badge>;
     }
   };
 
@@ -61,7 +61,6 @@ export default function Billing() {
       />
 
       <div className="panel">
-        {/* Filters */}
         <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
           <div style={{ flex: '1', minWidth: '200px' }}>
             <label style={{ display: 'none' }}>Search</label>
@@ -87,7 +86,6 @@ export default function Billing() {
           </div>
         </div>
 
-        {/* Data States */}
         {loading && data.length === 0 ? (
           <div style={{ padding: '48px', textAlign: 'center', color: 'var(--mute)' }}>Loading invoices...</div>
         ) : error ? (
@@ -122,9 +120,9 @@ export default function Billing() {
                       <td style={{ fontWeight: 600 }}>{money(inv.amount)}</td>
                       <td>{getStatusBadge(inv.status)}</td>
                       <td>
-                        <button className="btn mini" style={{ background: 'var(--line)', color: 'var(--ink)' }}>
+                        <Link to={`/invoices/${inv.id}`} className="btn mini" style={{ background: 'var(--line)', color: 'var(--ink)', textDecoration: 'none' }}>
                           View
-                        </button>
+                        </Link>
                       </td>
                     </tr>
                   ))}
@@ -132,7 +130,6 @@ export default function Billing() {
               </table>
             </div>
             
-            {/* Pagination Controls */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--line)' }}>
               <span style={{ fontSize: '0.9rem', color: 'var(--mute)' }}>
                 Showing page {page} {total > 0 ? `of ${Math.ceil(total / limit)}` : ''}
