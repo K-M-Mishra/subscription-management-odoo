@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Head, Stat, Empty, Badge } from '../ui';
-import { money } from '../data';
+import { money, formatDate } from '../data';
 import { getPayments, recordPayment } from '../api';
 
 export default function Payments() {
-  // Filters
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     d.setMonth(d.getMonth() - 1);
@@ -13,7 +12,6 @@ export default function Payments() {
   const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [method, setMethod] = useState('');
 
-  // Data states
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -23,8 +21,7 @@ export default function Payments() {
     setError(null);
     try {
       const response = await getPayments({ startDate, endDate, method });
-      // Depending on API response shape, use response.data or response
-      const fetchedPayments = response.data || response || [];
+      const fetchedPayments = response?.data || response || [];
       setPayments(fetchedPayments);
     } catch (err) {
       setError(err.message || 'Failed to load payments.');
@@ -37,7 +34,6 @@ export default function Payments() {
     fetchPayments();
   }, [startDate, endDate, method]);
 
-  // Calculate total of the filtered (visible) rows
   const totalAmount = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
   return (
@@ -86,7 +82,7 @@ export default function Payments() {
       ) : (
         <>
           <div className="panel" style={{ marginBottom: '24px', display: 'inline-block', padding: '16px 24px' }}>
-            <Stat label="Total for selected period" value={money(totalAmount)} />
+            <Stat title="Total for selected period" value={money(totalAmount)} />
           </div>
 
           <div className="panel">
@@ -113,11 +109,11 @@ export default function Payments() {
                   <tbody>
                     {payments.map((payment) => (
                       <tr key={payment.id}>
-                        <td>{new Date(payment.date).toLocaleDateString()}</td>
+                        <td>{formatDate(payment.date)}</td>
                         <td style={{ fontWeight: '500' }}>{payment.invoiceNumber || '-'}</td>
                         <td>{payment.customerName || '-'}</td>
                         <td>
-                          <Badge variant="neutral">{payment.method}</Badge>
+                          <Badge type="default">{payment.method}</Badge>
                         </td>
                         <td style={{ fontWeight: '600' }}>{money(payment.amount)}</td>
                         <td style={{ color: 'var(--mute)', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -136,10 +132,6 @@ export default function Payments() {
   );
 }
 
-// -----------------------------------------------------------------------------
-// Reusable RecordPaymentModal
-// -----------------------------------------------------------------------------
-
 export function RecordPaymentModal({ invoiceId, amountDue, onSuccess, onCancel }) {
   const [method, setMethod] = useState('Bank Transfer');
   const [amount, setAmount] = useState(amountDue);
@@ -155,7 +147,6 @@ export function RecordPaymentModal({ invoiceId, amountDue, onSuccess, onCancel }
 
     const paymentAmount = Number(amount);
 
-    // Client-side validation rules
     if (paymentAmount <= 0) {
       setError('Amount must be greater than zero.');
       return;
@@ -164,12 +155,8 @@ export function RecordPaymentModal({ invoiceId, amountDue, onSuccess, onCancel }
       setError('Amount cannot exceed the balance due.');
       return;
     }
-    if (!method) {
-      setError('Please select a payment method.');
-      return;
-    }
-    if (!date) {
-      setError('Please select a payment date.');
+    if (!method || !date) {
+      setError('Please provide required details.');
       return;
     }
 
@@ -191,108 +178,49 @@ export function RecordPaymentModal({ invoiceId, amountDue, onSuccess, onCancel }
 
   return (
     <>
-      {/* Dimmed Background Overlay */}
       <div 
-        style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(16, 28, 51, 0.4)',
-          zIndex: 99
-        }} 
+        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(16, 28, 51, 0.4)', zIndex: 99 }} 
         onClick={onCancel}
       />
-      
-      {/* Modal Container */}
       <div className="modal">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <h2 style={{ fontSize: '20px', margin: 0 }}>Record payment</h2>
-          <button 
-            onClick={onCancel}
-            style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--mute)' }}
-            aria-label="Close"
-          >
-            &times;
-          </button>
+          <button onClick={onCancel} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--mute)' }}>&times;</button>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            
             <div>
               <label>Amount due</label>
               <div style={{ fontSize: '18px', fontWeight: '600', color: 'var(--ink)', marginBottom: '8px' }}>
                 {money(amountDue)}
               </div>
             </div>
-
             <div>
               <label htmlFor="paymentAmount">Amount received</label>
-              <input 
-                id="paymentAmount"
-                type="number" 
-                step="0.01" 
-                value={amount} 
-                onChange={(e) => setAmount(e.target.value)} 
-                required
-              />
+              <input id="paymentAmount" type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
             </div>
-
             <div>
               <label htmlFor="paymentMethod">Payment method</label>
-              <select 
-                id="paymentMethod"
-                value={method} 
-                onChange={(e) => setMethod(e.target.value)}
-                required
-              >
+              <select id="paymentMethod" value={method} onChange={(e) => setMethod(e.target.value)} required>
                 <option value="Bank Transfer">Bank Transfer</option>
                 <option value="Credit Card">Credit Card</option>
                 <option value="UPI">UPI</option>
                 <option value="Cash">Cash</option>
               </select>
             </div>
-
             <div>
               <label htmlFor="paymentDate">Date</label>
-              <input 
-                id="paymentDate"
-                type="date" 
-                value={date} 
-                onChange={(e) => setDate(e.target.value)}
-                required 
-              />
+              <input id="paymentDate" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
             </div>
-
             <div>
               <label htmlFor="paymentNote">Note (optional)</label>
-              <textarea 
-                id="paymentNote"
-                rows="2"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Transaction ID or internal notes"
-              />
+              <textarea id="paymentNote" rows="2" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Transaction ID or internal notes" />
             </div>
-
             {error && <span className="form-error">{error}</span>}
-
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
-              <button 
-                type="button" 
-                className="btn" 
-                style={{ backgroundColor: 'var(--paper)', color: 'var(--ink)', border: '1px solid var(--line)' }}
-                onClick={onCancel}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </button>
-              <button 
-                type="submit" 
-                className="btn"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? 'Recording...' : 'Record payment'}
-              </button>
+              <button type="button" className="btn" style={{ backgroundColor: 'var(--paper)', color: 'var(--ink)', border: '1px solid var(--line)' }} onClick={onCancel} disabled={isSubmitting}>Cancel</button>
+              <button type="submit" className="btn" disabled={isSubmitting}>{isSubmitting ? 'Recording...' : 'Record payment'}</button>
             </div>
           </div>
         </form>
