@@ -16,7 +16,6 @@ export default function Auth() {
     setGlobalError(null);
     setFieldErrors({});
 
-    // Client-side validation
     const errors = {};
     if (!email.trim()) errors.email = 'Email is required to log in.';
     if (!password) errors.password = 'Password is required to log in.';
@@ -30,10 +29,8 @@ export default function Auth() {
     try {
       const res = await auth.login({ email, password });
       
-      // Save token and redirect
       if (res && res.token) {
         localStorage.setItem('token', res.token);
-        // Save role if backend sends it (for layout filtering)
         if (res.user?.role) {
           localStorage.setItem('role', res.user.role);
         }
