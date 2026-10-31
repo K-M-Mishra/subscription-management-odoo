@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { Head, Badge, Empty } from '../ui';
 import { money } from '../data';
 import { products } from '../api';
@@ -9,7 +8,6 @@ export default function Catalog() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Pagination & Filters
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
   const [total, setTotal] = useState(0);
@@ -45,15 +43,10 @@ export default function Catalog() {
       <Head 
         title="Products & Plans" 
         subtitle="Manage your software catalog, variants, and pricing plans."
-        actions={
-          <Link to="/products/new" className="btn" style={{ textDecoration: 'none' }}>
-            Add Product
-          </Link>
-        }
+        actions={<button className="btn">Add Product</button>}
       />
 
       <div className="panel">
-        {/* Filters */}
         <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
           <div style={{ flex: '1', maxWidth: '300px' }}>
             <label style={{ display: 'none' }}>Search</label>
@@ -66,7 +59,6 @@ export default function Catalog() {
           </div>
         </div>
 
-        {/* Data States */}
         {loading && data.length === 0 ? (
           <div style={{ padding: '48px', textAlign: 'center', color: 'var(--mute)' }}>Loading catalog...</div>
         ) : error ? (
@@ -117,7 +109,6 @@ export default function Catalog() {
               </table>
             </div>
             
-            {/* Pagination Controls */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--line)' }}>
               <span style={{ fontSize: '0.9rem', color: 'var(--mute)' }}>
                 Showing page {page} {total > 0 ? `of ${Math.ceil(total / limit)}` : ''}
