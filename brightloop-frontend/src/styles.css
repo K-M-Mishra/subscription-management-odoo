@@ -1,0 +1,23 @@
+:root {
+  --paper: #f1f3f8;
+  --ink: #0e1b2c;
+  --side: #101c33;
+  --loop: #2748e8;
+  --loop-soft: #e3e8ff;
+  --ok: #0b8a6b;
+  --warn: #b4234a;
+  --mute: #5b6678;
+  --line: #dde2ec;
+}
+
+body {
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: 'IBM Plex Sans', sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Bricolage Grotesque', sans-serif;
+}
