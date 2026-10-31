@@ -83,7 +83,7 @@ cd subscription-management-odoo/
 
 npm install
 npm run setup
-npm run dev:clean
+npm run dev
 ```
 
 <b> Access the App : </b>
