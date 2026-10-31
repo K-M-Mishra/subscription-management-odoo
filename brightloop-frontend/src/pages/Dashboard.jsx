@@ -5,7 +5,6 @@ import { money } from '../data';
 import { getSummary, getRevenue, getOverdue } from '../api';
 
 export default function Dashboard() {
-  // Global Filters
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     d.setMonth(d.getMonth() - 1);
@@ -13,16 +12,13 @@ export default function Dashboard() {
   });
   const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
 
-  // Table Filters
   const [search, setSearch] = useState('');
   const [customerId, setCustomerId] = useState('');
 
-  // Data States
   const [summary, setSummary] = useState(null);
   const [revenue, setRevenue] = useState([]);
   const [overdue, setOverdue] = useState([]);
 
-  // UI States
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -48,9 +44,7 @@ export default function Dashboard() {
     }
   };
 
-  // Reload when global dates or table filters change
   useEffect(() => {
-    // Debounce search input for overdue table
     const handler = setTimeout(() => {
       fetchDashboardData();
     }, 300);
@@ -95,7 +89,6 @@ export default function Dashboard() {
         </div>
       </Head>
 
-      {/* 4 Stat Cards */}
       <div style={{ 
         display: 'grid', 
         gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', 
@@ -116,12 +109,10 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Revenue Bar Chart (Pure CSS/SVG) */}
       <div className="panel" style={{ marginBottom: '24px' }}>
         <h3 style={{ fontFamily: 'Bricolage Grotesque', fontSize: '18px', marginBottom: '24px' }}>
           Revenue (Last 6 Months)
         </h3>
-        
         {revenue.length === 0 ? (
           <Empty title="No revenue data" description="There is no recorded revenue in this period." />
         ) : (
@@ -129,7 +120,6 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Overdue Invoices Table */}
       <div className="panel">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
           <h3 style={{ fontFamily: 'Bricolage Grotesque', fontSize: '18px', margin: 0 }}>
@@ -194,22 +184,17 @@ export default function Dashboard() {
   );
 }
 
-// -----------------------------------------------------------------------------
-// Sub-component: Pure SVG Bar Chart
-// -----------------------------------------------------------------------------
 function RevenueChart({ data }) {
   const maxAmount = Math.max(...data.map(d => d.amount), 1);
-  const chartHeight = 220; // internal coordinate system height
+  const chartHeight = 220; 
 
   return (
     <div>
       <div style={{ position: 'relative', height: `${chartHeight}px`, width: '100%', borderBottom: '1px solid var(--line)' }}>
         <svg width="100%" height="100%" preserveAspectRatio="none" style={{ overflow: 'visible' }}>
           {data.map((d, i) => {
-            const barWidthPercentage = 80 / data.length; // Dynamic width based on segments
+            const barWidthPercentage = 80 / data.length; 
             const xPosPercentage = (i * (100 / data.length)) + ((100 / data.length) / 2);
-            
-            // Calculate height relative to max amount
             const height = (d.amount / maxAmount) * chartHeight;
             const yPos = chartHeight - height;
 
@@ -229,8 +214,6 @@ function RevenueChart({ data }) {
           })}
         </svg>
       </div>
-      
-      {/* Chart X-Axis Labels */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
         {data.map((d, i) => (
           <div key={i} style={{ flex: 1, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '4px' }}>
