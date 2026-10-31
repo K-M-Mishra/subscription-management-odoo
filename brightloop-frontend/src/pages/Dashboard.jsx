@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Head, Stat, Badge, Empty } from '../ui';
-import { money } from '../data';
+import { money, formatDate } from '../data';
 import { getSummary, getRevenue, getOverdue } from '../api';
 
 export default function Dashboard() {
@@ -34,8 +34,7 @@ export default function Dashboard() {
         getOverdue({ ...globalParams, q: search, customerId })
       ]);
 
-      // FIX: Added || [] and || {} so it never crashes if API sends null
-      setSummary(summaryData?.data || summaryData || {});
+      setSummary(summaryData?.data || summaryData);
       setRevenue(revenueData?.data || revenueData || []);
       setOverdue(overdueData?.data || overdueData || []);
     } catch (err) {
@@ -114,7 +113,7 @@ export default function Dashboard() {
         <h3 style={{ fontFamily: 'Bricolage Grotesque', fontSize: '18px', marginBottom: '24px' }}>
           Revenue (Last 6 Months)
         </h3>
-        {!revenue || revenue.length === 0 ? (
+        {revenue.length === 0 ? (
           <Empty title="No revenue data" description="There is no recorded revenue in this period." />
         ) : (
           <RevenueChart data={revenue} />
@@ -145,7 +144,7 @@ export default function Dashboard() {
         </div>
 
         <div className="table-wrapper">
-          {!overdue || overdue.length === 0 ? (
+          {overdue.length === 0 ? (
             <Empty title="All clear!" description="No overdue invoices found for the selected criteria." />
           ) : (
             <table>
@@ -164,7 +163,7 @@ export default function Dashboard() {
                   <tr key={invoice.id}>
                     <td style={{ fontWeight: '500' }}>{invoice.invoiceNumber}</td>
                     <td>{invoice.customerName}</td>
-                    <td>{new Date(invoice.dueDate).toLocaleDateString()}</td>
+                    <td>{formatDate(invoice.dueDate)}</td>
                     <td style={{ fontWeight: '600' }}>{money(invoice.amount)}</td>
                     <td>
                       <Badge type="warn">Overdue</Badge>
@@ -186,17 +185,21 @@ export default function Dashboard() {
 }
 
 function RevenueChart({ data }) {
-  const maxAmount = Math.max(...data.map(d => d.amount), 1);
+  const safeData = Array.isArray(data) ? data : [];
+  const maxAmount = Math.max(...safeData.map(d => Number(d.amount) || 0), 1);
   const chartHeight = 220; 
+
+  if (safeData.length === 0) return null;
 
   return (
     <div>
       <div style={{ position: 'relative', height: `${chartHeight}px`, width: '100%', borderBottom: '1px solid var(--line)' }}>
         <svg width="100%" height="100%" preserveAspectRatio="none" style={{ overflow: 'visible' }}>
-          {data.map((d, i) => {
-            const barWidthPercentage = 80 / data.length; 
-            const xPosPercentage = (i * (100 / data.length)) + ((100 / data.length) / 2);
-            const height = (d.amount / maxAmount) * chartHeight;
+          {safeData.map((d, i) => {
+            const barWidthPercentage = 80 / safeData.length; 
+            const xPosPercentage = (i * (100 / safeData.length)) + ((100 / safeData.length) / 2);
+            const amt = Number(d.amount) || 0;
+            const height = (amt / maxAmount) * chartHeight;
             const yPos = chartHeight - height;
 
             return (
@@ -216,7 +219,7 @@ function RevenueChart({ data }) {
         </svg>
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
-        {data.map((d, i) => (
+        {safeData.map((d, i) => (
           <div key={i} style={{ flex: 1, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <span style={{ fontSize: '12px', color: 'var(--mute)' }}>{d.label || d.month}</span>
             <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--ink)' }}>{money(d.amount)}</span>
