@@ -1,116 +1,146 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-
-// Simple Badge component (for status like Active, Draft, Paid, Cancelled)
-export function Badge({ children, type = 'default' }) {
-  // type can be 'default', 'ok', 'warn', etc. 
-  // We'll rely on the base .badge class and inline color logic if needed, 
-  // but for now, .badge class handles the default look defined in styles.css
-  let bg = 'var(--loop-soft)';
-  let color = 'var(--loop)';
-
-  if (type === 'ok') {
-    bg = '#d1f4ec';
-    color = 'var(--ok)';
-  } else if (type === 'warn') {
-    bg = '#fbe8ec';
-    color = 'var(--warn)';
-  } else if (type === 'mute') {
-    bg = 'var(--line)';
-    color = 'var(--mute)';
-  }
-
+import { useEffect, useState } from 'react';
+export function useLoad(loader, deps = []) {
+  const [data, setData] = useState(null),
+    [error, setError] = useState(''),
+    [loading, setLoading] = useState(true),
+    [version, setVersion] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    setError('');
+    Promise.resolve()
+      .then(loader)
+      .then((d) => {
+        if (alive) setData(d);
+      })
+      .catch((e) => {
+        if (alive) setError(e.message);
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [...deps, version]);
+  return { data, error, loading, reload: () => setVersion((v) => v + 1) };
+}
+export function Head({ title, subtitle, actions }) {
   return (
-    <span className="badge" style={{ backgroundColor: bg, color: color }}>
+    <header className="page-head">
+      <div>
+        <p className="eyebrow">BRIGHTLOOP WORKSPACE</p>
+        <h1>{title}</h1>
+        {subtitle && <p className="muted">{subtitle}</p>}
+      </div>
+      <div className="actions">{actions}</div>
+    </header>
+  );
+}
+export function Alert({ children, success = false }) {
+  return children ? (
+    <div
+      role={success ? 'status' : 'alert'}
+      className={`alert ${success ? 'success' : ''}`}
+    >
+      {children}
+    </div>
+  ) : null;
+}
+export function Field({ label, children, ...props }) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      {children || <input {...props} />}
+    </label>
+  );
+}
+export function Badge({ children }) {
+  return (
+    <span className={'badge ' + String(children).toLowerCase()}>
       {children}
     </span>
   );
 }
-
-// Statistic component for Dashboards
-export function Stat({ title, value }) {
+export function Stat({ title, value, hint }) {
   return (
-    <div className="panel">
-      <div style={{ color: 'var(--mute)', fontSize: '0.9rem', marginBottom: '8px' }}>
-        {title}
-      </div>
-      <div className="stat" style={{ fontSize: '2rem' }}>
-        {value}
-      </div>
+    <div className="panel stat">
+      <p className="muted">{title}</p>
+      <strong>{value}</strong>
+      {hint && <small>{hint}</small>}
     </div>
   );
 }
-
-// Page Header component with optional right-side actions
-export function Head({ title, subtitle, actions }) {
+export function Table({ columns, rows = [], empty = 'No records yet.' }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-      <div>
-        <h1 className="head" style={{ fontSize: '1.75rem', marginBottom: '4px' }}>{title}</h1>
-        {subtitle && <p style={{ color: 'var(--mute)' }}>{subtitle}</p>}
-      </div>
-      {actions && (
-        <div style={{ display: 'flex', gap: '12px' }}>
-          {actions}
-        </div>
-      )}
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            {columns.map((c) => (
+              <th key={c.key}>{c.label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id || r.month}>
+              {columns.map((c) => (
+                <td key={c.key}>
+                  {c.render ? c.render(r) : (r[c.key] ?? '—')}
+                </td>
+              ))}
+            </tr>
+          ))}
+          {!rows.length && (
+            <tr>
+              <td className="empty" colSpan={columns.length}>
+                {empty}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }
-
-// Empty State component
-export function Empty({ title, description, actionText, onAction }) {
+export function Pager({ data, page, setPage }) {
   return (
-    <div className="panel" style={{ textAlign: 'center', padding: '48px 24px' }}>
-      <h3 style={{ marginBottom: '8px' }}>{title}</h3>
-      <p style={{ color: 'var(--mute)', marginBottom: '24px' }}>{description}</p>
-      {actionText && onAction && (
-        <button className="btn" onClick={onAction}>
-          {actionText}
+    <div className="pager">
+      <span>
+        {data?.total || 0} records · Page {page}
+      </span>
+      <div className="actions">
+        <button
+          className="btn secondary"
+          disabled={page <= 1}
+          onClick={() => setPage(page - 1)}
+        >
+          Previous
         </button>
-      )}
+        <button
+          className="btn secondary"
+          disabled={!data || page * data.limit >= data.total}
+          onClick={() => setPage(page + 1)}
+        >
+          Next
+        </button>
+      </div>
     </div>
   );
 }
-
-// Stepper component for wizards (like creating a subscription: Draft -> Quote -> Confirmed)
-export function Stepper({ steps, currentStep }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px' }}>
-      {steps.map((step, index) => {
-        const isActive = index === currentStep;
-        const isPast = index < currentStep;
-        return (
-          <React.Fragment key={index}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              color: isActive || isPast ? 'var(--loop)' : 'var(--mute)',
-              fontWeight: isActive ? 600 : 500,
-              fontSize: '0.9rem'
-            }}>
-              <div style={{
-                width: '24px',
-                height: '24px',
-                borderRadius: '50%',
-                backgroundColor: isActive || isPast ? 'var(--loop-soft)' : 'var(--line)',
-                color: isActive || isPast ? 'var(--loop)' : 'var(--mute)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: '8px',
-                fontSize: '0.8rem'
-              }}>
-                {index + 1}
-              </div>
-              {step}
-            </div>
-            {index < steps.length - 1 && (
-              <div style={{ height: '2px', flex: 1, backgroundColor: isPast ? 'var(--loop-soft)' : 'var(--line)' }} />
-            )}
-          </React.Fragment>
-        );
-      })}
-    </div>
-  );
+export function Loading({ load, children }) {
+  if (load.error)
+    return (
+      <Alert>
+        {load.error}{' '}
+        <button className="text-btn" onClick={load.reload}>
+          Retry
+        </button>
+      </Alert>
+    );
+  if (load.loading && !load.data)
+    return <p className="panel muted">Loading your workspace…</p>;
+  return children;
 }
+export const today = () => new Date().toISOString().slice(0, 10);
