@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Head, Badge, Empty } from '../ui';
 import { money, formatDate } from '../data';
 import { subscriptions } from '../api';
@@ -10,9 +11,10 @@ export default function Subscriptions() {
   
   // Pagination & Filters
   const [page, setPage] = useState(1);
-  const [limit] = useState(10); // server-side pagination
+  const [limit] = useState(10); 
   const [total, setTotal] = useState(0);
   const [statusFilter, setStatusFilter] = useState('');
+  const [planFilter, setPlanFilter] = useState(''); 
   const [searchQuery, setSearchQuery] = useState('');
 
   const fetchSubscriptions = async () => {
@@ -23,9 +25,9 @@ export default function Subscriptions() {
         page,
         limit,
         status: statusFilter,
+        plan: planFilter,
         q: searchQuery
       });
-      // Fallbacks in case API returns direct array vs nested object
       setData(res?.data || res || []);
       setTotal(res?.total || 0);
     } catch (err) {
@@ -36,12 +38,11 @@ export default function Subscriptions() {
   };
 
   useEffect(() => {
-    // Debounce to prevent too many API calls while typing
     const handler = setTimeout(() => {
       fetchSubscriptions();
     }, 300);
     return () => clearTimeout(handler);
-  }, [page, statusFilter, searchQuery]);
+  }, [page, statusFilter, planFilter, searchQuery]);
 
   const getStatusBadge = (status) => {
     const s = (status || '').toLowerCase();
@@ -60,11 +61,14 @@ export default function Subscriptions() {
       <Head 
         title="Subscriptions" 
         subtitle="Manage customer plans and billing cycles."
-        actions={<button className="btn">Create subscription</button>}
+        actions={
+          <Link to="/subscriptions/new" className="btn" style={{ textDecoration: 'none' }}>
+            Create subscription
+          </Link>
+        }
       />
 
       <div className="panel">
-        {/* Filters */}
         <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
           <div style={{ flex: '1', minWidth: '200px' }}>
             <label style={{ display: 'none' }}>Search</label>
@@ -75,6 +79,20 @@ export default function Subscriptions() {
               onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
             />
           </div>
+          
+          <div style={{ width: '180px' }}>
+            <label style={{ display: 'none' }}>Plan Filter</label>
+            <select 
+              value={planFilter} 
+              onChange={(e) => { setPlanFilter(e.target.value); setPage(1); }}
+            >
+              <option value="">All Plans</option>
+              <option value="basic">Basic Plan</option>
+              <option value="pro">Pro Plan</option>
+              <option value="enterprise">Enterprise Plan</option>
+            </select>
+          </div>
+
           <div style={{ width: '180px' }}>
             <label style={{ display: 'none' }}>Status Filter</label>
             <select 
@@ -91,7 +109,6 @@ export default function Subscriptions() {
           </div>
         </div>
 
-        {/* Data States */}
         {loading && data.length === 0 ? (
           <div style={{ padding: '48px', textAlign: 'center', color: 'var(--mute)' }}>Loading subscriptions...</div>
         ) : error ? (
@@ -113,6 +130,7 @@ export default function Subscriptions() {
                     <th>Amount</th>
                     <th>Status</th>
                     <th>Created</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -124,13 +142,17 @@ export default function Subscriptions() {
                       <td style={{ fontWeight: 600 }}>{money(sub.amount)}</td>
                       <td>{getStatusBadge(sub.status)}</td>
                       <td style={{ color: 'var(--mute)' }}>{formatDate(sub.createdAt)}</td>
+                      <td>
+                        <Link to={`/subscriptions/${sub.id}`} className="btn mini" style={{ background: 'var(--line)', color: 'var(--ink)', textDecoration: 'none' }}>
+                          View
+                        </Link>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             
-            {/* Pagination Controls */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--line)' }}>
               <span style={{ fontSize: '0.9rem', color: 'var(--mute)' }}>
                 Showing page {page} {total > 0 ? `of ${Math.ceil(total / limit)}` : ''}

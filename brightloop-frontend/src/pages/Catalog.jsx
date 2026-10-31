@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Head, Badge, Empty } from '../ui';
 import { money } from '../data';
 import { products } from '../api';
@@ -44,7 +45,11 @@ export default function Catalog() {
       <Head 
         title="Products & Plans" 
         subtitle="Manage your software catalog, variants, and pricing plans."
-        actions={<button className="btn">Add Product</button>}
+        actions={
+          <Link to="/products/new" className="btn" style={{ textDecoration: 'none' }}>
+            Add Product
+          </Link>
+        }
       />
 
       <div className="panel">

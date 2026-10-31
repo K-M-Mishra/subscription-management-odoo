@@ -34,9 +34,10 @@ export default function Dashboard() {
         getOverdue({ ...globalParams, q: search, customerId })
       ]);
 
-      setSummary(summaryData?.data || summaryData);
-      setRevenue(revenueData?.data || revenueData);
-      setOverdue(overdueData?.data || overdueData);
+      // FIX: Added || [] and || {} so it never crashes if API sends null
+      setSummary(summaryData?.data || summaryData || {});
+      setRevenue(revenueData?.data || revenueData || []);
+      setOverdue(overdueData?.data || overdueData || []);
     } catch (err) {
       setError(err.message || 'Failed to load dashboard data.');
     } finally {
@@ -113,7 +114,7 @@ export default function Dashboard() {
         <h3 style={{ fontFamily: 'Bricolage Grotesque', fontSize: '18px', marginBottom: '24px' }}>
           Revenue (Last 6 Months)
         </h3>
-        {revenue.length === 0 ? (
+        {!revenue || revenue.length === 0 ? (
           <Empty title="No revenue data" description="There is no recorded revenue in this period." />
         ) : (
           <RevenueChart data={revenue} />
@@ -144,7 +145,7 @@ export default function Dashboard() {
         </div>
 
         <div className="table-wrapper">
-          {overdue.length === 0 ? (
+          {!overdue || overdue.length === 0 ? (
             <Empty title="All clear!" description="No overdue invoices found for the selected criteria." />
           ) : (
             <table>
